@@ -1,0 +1,16 @@
+meta {
+  name: filter
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{host}}/api/pokemon?tipo=4&nombre_parcial=ido
+  body: none
+  auth: inherit
+}
+
+params:query {
+  tipo: 4
+  nombre_parcial: ido
+}
