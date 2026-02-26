@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 from modelos.modelos import Generacion
-from constantes.constantes import RUTA_GENERATION_NAMES_CSV
 from dependencias.dependencias import DatabaseDep
+from dependencias.dependencias_de_la_db import SessionDep
 
 router = APIRouter()
 
 
 @router.get("/")
-def listar_generaciones(db: DatabaseDep) -> list[Generacion]:
-    return db.obtener_generaciones()
+def get_generaciones(session: SessionDep, db: DatabaseDep) -> list[Generacion]:
+    return db.get_generaciones(session)

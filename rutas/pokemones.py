@@ -1,67 +1,60 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from dependencias.dependencias import DatabaseDep
-from modelos.modelos import Pokemon, PokemonPorId
-from utils.pokemones import es_del_mismo_tipo
+from dependencias.dependencias_de_la_db import SessionDep
+from modelos.modelos import PokemonPorId, PokemonLista, Generacion
+from modelos.modelos_de_la_db import PokemonTabla
+from modelos.filtros import FiltrosPokemon
 
 router = APIRouter()
 
 
 @router.get("/")
-def obtener_pokemones(
-    db: DatabaseDep, tipo: int | None = None, nombre_parcial: str | None = None
-) -> list[Pokemon]:
-    pokemones = db.obtener_pokemones()
-    pokemones_filtrados = []
+def get_pokemones(
+    session: SessionDep, db: DatabaseDep, filtros: FiltrosPokemon = Depends()
+) -> list[PokemonLista]:
+    pokemones = db.get_pokemones(session, filtros)
 
-    if tipo is not None and nombre_parcial is None:
-        for p in pokemones:
-            if es_del_mismo_tipo(tipo, p):
-                pokemones_filtrados.append(p)
-        pokemones = pokemones_filtrados
-
-    if nombre_parcial is not None and tipo is None:
-        for p in pokemones:
-            if nombre_parcial.lower() not in p.nombre.lower():
-                continue
-            pokemones_filtrados.append(p)
-        pokemones = pokemones_filtrados
-
-    if nombre_parcial is not None and tipo is not None:
-        for p in pokemones:
-            if nombre_parcial.lower() in p.nombre.lower() and es_del_mismo_tipo(
-                tipo, p
-            ):
-                pokemones_filtrados.append(p)
-        pokemones = pokemones_filtrados
     return pokemones
 
 
 @router.get("/{id}", response_model=PokemonPorId)
-def get_pokemon(id: int, db: DatabaseDep):
+def get_pokemon(session: SessionDep, id: int, db: DatabaseDep):
     if id < 0:
         raise HTTPException(status_code=422, detail="El ID no puede ser negativo")
 
-    pokemon = db.get(id)
-    if pokemon is None:
+    pokemon = session.get(PokemonTabla, id)
+
+    if not pokemon:
         raise HTTPException(status_code=404, detail="Pokemon no encontrado")
 
-    habilidades = db.get_habilidades(id)
-    estadisticas = db.get_estadisticas(id)
-    evoluciones = db.get_evoluciones(id)
+    habilidades = db.get_habilidades(session, id)
+    generaciones = [
+        Generacion(id=generacion.id_generacion, nombre=generacion.nombre_generacion)
+        for generacion in pokemon.generaciones
+    ]
+    tipos = db.get_tipos_pokemon(session, id)
+    evoluciones = db.get_evoluciones(session, id)
     movimientos_huevo, movimientos_maquina, movimientos_nivel = (
-        db.obtener_movimientos_pokemon(id)
+        db.get_movimientos_pokemon(session, id)
     )
 
     return PokemonPorId(
-        id=pokemon.id,
+        id=pokemon.id_pokemon,
         nombre=pokemon.nombre,
         imagen=pokemon.imagen,
         altura=pokemon.altura,
         peso=pokemon.peso,
-        generaciones=pokemon.generaciones,
-        tipos=pokemon.tipos,
+        generaciones=generaciones,
+        tipos=tipos,
         habilidades=habilidades,
-        estadisticas=estadisticas,
+        estadisticas={
+            "ataque": pokemon.ataque,
+            "defensa": pokemon.defensa,
+            "ataque_especial": pokemon.ataque_especial,
+            "defensa_especial": pokemon.defensa_especial,
+            "puntos_de_golpe": pokemon.puntos_de_golpe,
+            "velocidad": pokemon.velocidad,
+        },
         evoluciones=evoluciones,
         movimientos_huevo=movimientos_huevo,
         movimientos_maquina=movimientos_maquina,

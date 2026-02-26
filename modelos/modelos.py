@@ -6,10 +6,15 @@ class Generacion(BaseModel):
     nombre: str
 
 
+class Debilidad(BaseModel):
+    id: int
+    nombre: str
+
+
 class Tipo(BaseModel):
     id: int
     nombre: str
-    debilidades: list = []
+    debilidades: list[Debilidad] = []
 
 
 class TipoMovimiento(BaseModel):
@@ -35,6 +40,23 @@ class Estadisticas(BaseModel):
     defensa_especial: int
     puntos_de_golpe: int
     velocidad: int
+
+
+class PokemonLista(BaseModel):
+    id: int
+    nombre: str
+    imagen: str
+    generaciones: list[Generacion]
+    tipos: list[TipoMovimiento]
+
+
+class PokemonIntegrante(BaseModel):
+    id: int
+    nombre: str
+    imagen: str
+    estadisticas: Estadisticas
+    generaciones: list[Generacion]
+    tipos: list[Tipo]
 
 
 class Pokemon(BaseModel):
@@ -92,14 +114,17 @@ class MovimientoDetallado(Movimiento):
 class Integrante(BaseModel):
     id: int
     apodo: str
-    pokemon: Pokemon
+    pokemon: PokemonIntegrante
     movimientos: list[Movimiento] = []
 
 
-class Equipo(BaseModel):
+class EquipoBase(BaseModel):
     id: int
     nombre: str
     generacion: Generacion
+
+
+class Equipo(EquipoBase):
     integrantes: list[Integrante] = []
 
 
@@ -120,3 +145,7 @@ class IntegranteDeEquipoUpsert(BaseModel):
 
 class MovimientoAIntegrante(BaseModel):
     id_movimiento: int
+
+
+class EquipoListado(EquipoBase):
+    cantidad_integrantes: int

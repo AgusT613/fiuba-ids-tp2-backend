@@ -1,5 +1,6 @@
 resumen.txt
 __pycache__
 .vscode
+database.db
+venv
 .pytest_cache
-.coverage

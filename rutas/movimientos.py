@@ -1,21 +1,25 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from dependencias.dependencias import DatabaseDep
+from dependencias.dependencias_de_la_db import SessionDep
+from modelos.filtros import FiltrosMovimiento
 from modelos.modelos import Movimiento, MovimientoDetallado
-from fastapi import HTTPException
 
 router = APIRouter()
 
 
 @router.get("/")
-def obtener_movimientos(db: DatabaseDep) -> list[Movimiento]:
-    return db.obtener_movimientos()
+def get_movimientos(
+    session: SessionDep, db: DatabaseDep, filtros: FiltrosMovimiento = Depends()
+) -> list[Movimiento]:
+    movimientos = db.get_movimientos(session, filtros)
+
+    return movimientos
 
 
 @router.get("/{id}")
-def obtener_movimiento_id(db: DatabaseDep, id: int) -> MovimientoDetallado:
-    movimiento = db.obtener_movimiento(id)
-
-    if not movimiento:
-        raise HTTPException(status_code=404, detail=f"Movimiento no encontrado")
+def get_movimiento(
+    session: SessionDep, db: DatabaseDep, id: int
+) -> MovimientoDetallado:
+    movimiento = db.get_movimiento(session, id)
 
     return movimiento

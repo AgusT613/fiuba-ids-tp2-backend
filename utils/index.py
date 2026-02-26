@@ -133,19 +133,16 @@ def obtener_debilidades_por_tipo(id_tipo: int) -> list[dict]:
     with open(RUTA_TYPE_EFFICACY_CSV, encoding="utf-8") as archivo:
         csvFile = csv.DictReader(archivo)
         for linea in csvFile:
-            tipo_atacante = int(
-                linea["damage_type_id"]
-            )  # damage_type_id (el que ataca)
-            tipo_defensor = int(
-                linea["target_type_id"]
-            )  # target_type_id (el que recibe el daño)
-            factor = int(linea["damage_factor"])  # damage_factor
+            # damage_type_id (el que ataca)
+            tipo_atacante = int(linea["damage_type_id"])
+            # target_type_id (el que recibe el daño)
+            tipo_defensor = int(linea["target_type_id"])
+            factor = int(linea["damage_factor"])
 
             # Solo buscamos las relaciones donde damage_factor > 100
             if tipo_defensor == id_tipo and factor > 100:
-                nombre_tipo = obtener_nombre_tipo(
-                    tipo_atacante
-                )  # Nombre del tipo atacante
+                # Nombre del tipo atacante
+                nombre_tipo = obtener_nombre_tipo(tipo_atacante)
                 debilidades.append({"id": tipo_atacante, "nombre": nombre_tipo})
     return debilidades
 
