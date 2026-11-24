@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from dependencias.dependencias import DatabaseDep
 from dependencias.dependencias_de_la_db import SessionDep
@@ -6,20 +6,14 @@ from modelos.modelos import (
     Equipo,
     EquipoUpsert,
     EquipooUpsert,
-    Generacion,
     Integrante,
     IntegranteUpsert,
     Movimiento,
     MovimientoAIntegrante,
     IntegranteDeEquipoUpsert,
     EquipoListado,
-    TipoMovimiento,
 )
-from modelos.mappers import map_integrante_tabla_to_dto
-from modelos.modelos_de_la_db import (
-    EquipoTabla,
-    PokemonTabla,
-)
+from servicios.equipo_servicio import EquipoServicio
 
 router = APIRouter()
 
@@ -62,43 +56,17 @@ def create_integrante_de_equipo(
     return integrante
 
 
-@router.put("/{id_equipo}/integrantes/{id_integrante}")
+@router.put("/{id_equipo}/integrantes/{id_integrante}", response_model=Integrante)
 def edit_integrante_de_equipo(
     session: SessionDep,
     db: DatabaseDep,
     id_equipo: int,
     id_integrante: int,
     body: IntegranteDeEquipoUpsert,
-):
-    equipo = session.get(EquipoTabla, id_equipo)
-    movimientos_mostrar = []
-
-    if len(body.movimientos) > 4:
-        raise HTTPException(status_code=400, detail="Maximo 4 movimientos")
-    for integrante in equipo.integrantes:
-        if integrante.id_integrante_dentro_del_grupo == id_integrante:
-            integrante.movimientos_del_integrante = []
-            pokemon_encontrado = session.get(PokemonTabla, integrante.id_pokemon)
-            for movimiento_id in body.movimientos:
-                movimiento = db.get_movimiento_simple(session, movimiento_id)
-                if not movimiento:
-                    raise HTTPException(
-                        status_code=404, detail="Movimiento no encontrado"
-                    )
-                if movimiento not in integrante.movimientos_del_integrante:
-                    movimiento_mostrar = db.mostrar_por_metodo_de_mov(movimiento)
-                    movimientos_mostrar.append(movimiento_mostrar)
-                    integrante.movimientos_del_integrante.append(movimiento)
-                else:
-                    raise HTTPException(
-                        status_code=400, detail="Un movimiento esta repetido"
-                    )
-
-            integrante.apodo = body.apodo
-            session.commit()
-            return map_integrante_tabla_to_dto(
-                integrante, pokemon_encontrado, movimientos=movimientos_mostrar
-            )
+) -> Integrante:
+    return EquipoServicio.editar_integrante(
+        session, db, id_equipo, id_integrante, body
+    )
 
 
 @router.put("/{id_equipo}")
@@ -113,49 +81,20 @@ def update_equipo(
     return equipo
 
 
-@router.post("/{id_equipo}/integrantes/{id_integrante}/movimientos")
+@router.post(
+    "/{id_equipo}/integrantes/{id_integrante}/movimientos",
+    response_model=Movimiento,
+)
 def add_movimiento_a_integrante(
     session: SessionDep,
     db: DatabaseDep,
     id_equipo: int,
     id_integrante: int,
     id_movimiento: MovimientoAIntegrante,
-):
-    equipo = session.get(EquipoTabla, id_equipo)
-
-    for integrante in equipo.integrantes:
-        if integrante.id_integrante_dentro_del_grupo == id_integrante:
-            movimiento = db.get_movimiento_simple(session, id_movimiento.id_movimiento)
-            if not movimiento:
-                raise HTTPException(status_code=404, detail="Movimiento no encontrado")
-            ya_tiene_mov = any(
-                mov.id_movimiento == movimiento.id_movimiento
-                for mov in integrante.movimientos_del_integrante
-            )
-            if not ya_tiene_mov:
-                if len(integrante.movimientos_del_integrante) == 4:
-                    raise HTTPException(status_code=400, detail="Maximo 4 movimientos")
-                integrante.movimientos_del_integrante.append(movimiento)
-                session.commit()
-                return Movimiento(
-                    id=movimiento.id_movimiento,
-                    nombre=movimiento.nombre,
-                    generacion=Generacion(
-                        id=movimiento.generacion.id_generacion,
-                        nombre=movimiento.generacion.nombre_generacion,
-                    ),
-                    tipo=TipoMovimiento(
-                        id=movimiento.tipo.id_tipo, nombre=movimiento.tipo.nombre_tipo
-                    ),
-                    categoria=movimiento.clase_de_daño,
-                    potencia=movimiento.poder,
-                    precision=movimiento.precision,
-                    puntos_de_poder=movimiento.PP,
-                    efecto=movimiento.efecto,
-                )
-            else:
-                raise HTTPException(status_code=400, detail="Movimiento Repetido")
-    raise HTTPException(status_code=404, detail="Integrante no encontrado")
+) -> Movimiento:
+    return EquipoServicio.agregar_movimiento_a_integrante(
+        session, db, id_equipo, id_integrante, id_movimiento.id_movimiento
+    )
 
 
 @router.delete("/{id_equipo}/integrantes/{id_integrante}", response_model=Integrante)
