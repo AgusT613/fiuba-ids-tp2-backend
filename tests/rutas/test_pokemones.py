@@ -1,40 +1,12 @@
 from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
-from database.database import Database
-from dependencias.dependencias import get_database
-from dependencias.dependencias_de_la_db import get_session
-from main import app
 from tests.constantes.constantes import MOCK_LISTA_POKEMONES
 from modelos.filtros import FiltrosPokemon
 from modelos.modelos_de_la_db import PokemonTabla
-import pytest
-from sqlmodel import Session
-
-client = TestClient(app)
-
-mock_db = MagicMock(Database)
-app.dependency_overrides[get_database] = lambda: mock_db
+from tests.rutas.conftest import client
 
 
-@pytest.fixture
-def mock_session():
-    return MagicMock(spec=Session)
-
-
-@pytest.fixture
-def mock_db():
-    return MagicMock(spec=Database)
-
-
-@pytest.fixture(autouse=True)
-def override_dependencies(mock_session, mock_db):
-    app.dependency_overrides[get_session] = lambda: mock_session
-    app.dependency_overrides[get_database] = lambda: mock_db
-    yield
-    app.dependency_overrides.clear()
-
-
-def test_listar_pokemones_con_nombre_parcial_invalido():
+def test_listar_pokemones_con_nombre_parcial_invalido(mock_db):
+    mock_db.get_pokemones.return_value = []
     response = client.get("/api/pokemon?nombre_parcial=123")
     assert response.status_code == 200
     assert response.json() == []
@@ -321,8 +293,6 @@ def test_get_pokemon_completo_exitoso(mock_session, mock_db):
     mock_db.get_tipos_pokemon.assert_called_once_with(mock_session, 1)
     mock_db.get_evoluciones.assert_called_once_with(mock_session, 1)
     mock_db.get_movimientos_pokemon.assert_called_once_with(mock_session, 1)
-
-    app.dependency_overrides = {}
 
 
 # Pokemon con movimientos sólo de una categoría (por nivel, máquina o huevo).

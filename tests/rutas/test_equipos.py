@@ -30,26 +30,7 @@ from tests.constantes.constantes import (
     MOCK_MOV_MOSTRAR_230,
 )
 from modelos.modelos_de_la_db import EquipoTabla
-
-client = TestClient(app)
-
-
-@pytest.fixture
-def mock_session():
-    return MagicMock(spec=Session)
-
-
-@pytest.fixture
-def mock_db():
-    return MagicMock(spec=Database)
-
-
-@pytest.fixture(autouse=True)
-def override_dependencies(mock_session, mock_db):
-    app.dependency_overrides[get_session] = lambda: mock_session
-    app.dependency_overrides[get_database] = lambda: mock_db
-    yield
-    app.dependency_overrides.clear()
+from tests.rutas.conftest import client
 
 
 def test_listar_equipos_lista_con_equipos(mock_session, mock_db):
@@ -312,7 +293,7 @@ def test_actuaizar_equipo_generacion_invalida(mock_session, mock_db):
     mock_db.update_equipo.assert_called_once_with(mock_session, 1, ANY)
 
 
-def test_actuaizar_equipo_nombre_equipo_repetido(mock_session, mock_db):
+def test_actualizar_equipo_nombre_equipo_repetido(mock_session, mock_db):
     equipo_actualizar = {
         "nombre": "los testeadors 5 el test contraataca",
         "id_generacion": 98,
@@ -341,7 +322,7 @@ def test_actuaizar_equipo_nombre_equipo_repetido(mock_session, mock_db):
     mock_db.update_equipo.assert_called_once_with(mock_session, 1, ANY)
 
 
-def test_actuaizar_equipo_nombre_equipo_repetido(mock_session, mock_db):
+def test_actualizar_equipo_pokemon_no_valido_para_generacion(mock_session, mock_db):
     equipo_actualizar = {
         "nombre": "los testeadors 5 el test contraataca",
         "id_generacion": 2,
@@ -584,36 +565,42 @@ def test_actualizar_integrante_caso_movimiento_no_encontrado(mock_session, mock_
 
 
 def test_agregar_movimiento_a_integrante_caso_valido(mock_session, mock_db):
-    #    integrante = MagicMock()
-    #    integrante.id_integrante_dentro_del_grupo = 1
-    #    integrante.id_pokemon = 30
-    #    integrante.movimientos = []
-    #
-    #    equipo_creado = MagicMock()
-    #    equipo_creado.integrantes = [integrante]
-    #
-    #    movimiento1 = MagicMock(MOCK_MOV_228)
-    #    movimiento1.generacion = MagicMock(
-    #        id_generacion=2, nombre_generacion="Generación II"
-    #    )
-    #    movimiento1.tipo = MagicMock(id=1, nombre="Normal")
-    #
-    #    mock_session.get.return_value = equipo_creado
-    #    mock_db.get_movimiento_simple.return_value = movimiento1
-    #
-    #    response = client.post(
-    #        "/api/equipos/1/integrantes/1/movimientos", json={"id_movimiento": 228}
-    #    )
-    #    assert response.status_code == 200
-    #    content = response.json()
-    #    assert content["id"] == 228
-    #    assert content["nombre"] == "Destructor"
-    #    assert content["generacion"]["nombre"] == "Generación II"
-    #    assert content["tipo"]["nombre"] == "Normal"
-    #
-    #    mock_session.commit.assert_called_once()
-    #    mock_db.get_movimiento_simple.assert_called_once_with(mock_session, 228)
-    pass
+    integrante = MagicMock()
+    integrante.id_integrante_dentro_del_grupo = 1
+    integrante.id_pokemon = 30
+    integrante.movimientos_del_integrante = []
+
+    equipo_creado = MagicMock()
+    equipo_creado.integrantes = [integrante]
+
+    movimiento1 = MagicMock()
+    movimiento1.id_movimiento = 228
+    movimiento1.nombre = "Destructor"
+    movimiento1.clase_de_daño = "físico"
+    movimiento1.poder = 40
+    movimiento1.precision = 100
+    movimiento1.PP = 35
+    movimiento1.efecto = "Inflicts regular damage with no additional effect."
+    movimiento1.generacion = MagicMock(
+        id_generacion=2, nombre_generacion="Generación II"
+    )
+    movimiento1.tipo = MagicMock(id_tipo=1, nombre_tipo="Normal")
+
+    mock_session.get.return_value = equipo_creado
+    mock_db.get_movimiento_simple.return_value = movimiento1
+
+    response = client.post(
+        "/api/equipos/1/integrantes/1/movimientos", json={"id_movimiento": 228}
+    )
+    assert response.status_code == 200
+    content = response.json()
+    assert content["id"] == 228
+    assert content["nombre"] == "Destructor"
+    assert content["generacion"]["nombre"] == "Generación II"
+    assert content["tipo"]["nombre"] == "Normal"
+
+    mock_session.commit.assert_called_once()
+    mock_db.get_movimiento_simple.assert_called_once_with(mock_session, 228)
 
 
 def test_agregar_movimiento_integrante_caso_movimiento_inexistente(

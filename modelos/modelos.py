@@ -24,7 +24,7 @@ class TipoMovimiento(BaseModel):
 
 class Evoluciones(BaseModel):
     id: int
-    imagen: str
+    imagen: str = ""
     nombre: str
 
 
@@ -65,8 +65,8 @@ class Pokemon(BaseModel):
     imagen: str
     altura: float
     peso: float
-    generaciones: list = []
-    tipos: list = []
+    generaciones: list[Generacion] = []
+    tipos: list[TipoMovimiento] = []
 
 
 class PokemonMovimiento(BaseModel):
@@ -97,9 +97,9 @@ class PokemonPorId(BaseModel):
     peso: float
     generaciones: list[Generacion] = []
     tipos: list[Tipo] = []
-    habilidades: list = []
+    habilidades: list[Habilidades] = []
     estadisticas: Estadisticas
-    evoluciones: list = []
+    evoluciones: list[Evoluciones] = []
     movimientos_huevo: list[Movimiento] = []
     movimientos_maquina: list[Movimiento] = []
     movimientos_nivel: list[Movimiento] = []
@@ -128,9 +128,13 @@ class Equipo(EquipoBase):
     integrantes: list[Integrante] = []
 
 
-class EquipooUpsert(BaseModel):
+class EquipoUpsert(BaseModel):
     nombre: str
     id_generacion: int
+
+
+# Alias para compatibilidad hacia atrás
+EquipooUpsert = EquipoUpsert
 
 
 class IntegranteUpsert(BaseModel):

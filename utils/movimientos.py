@@ -58,27 +58,55 @@ def get_query_filtrar(metodo_movimiento_id: int, movimiento_id: int):
 
 def filtrar_pokemones(
     movimiento_id: int,
+    session: Session | None = None,
 ) -> tuple[list[PokemonMovimiento], list[PokemonMovimiento], list[PokemonMovimiento]]:
     """
     Devuelve tres listas con todos los pokemones que pueden aprender "movimiento"
 
     - metodo_movimiento = "huevo" | "nivel" | "maquina"
     """
-    pokemon_por_huevo = []
-    pokemon_por_nivel = []
-    pokemon_por_maquina = []
+    def _ejecutar(s: Session):
+        query = (
+            select(PokemonTabla, PokemonMovimientoAprendizajeTabla.metodo_de_aprendizaje)
+            .join(
+                PokemonMovimientoAprendizajeTabla,
+                PokemonTabla.id_pokemon == PokemonMovimientoAprendizajeTabla.id_pokemon,
+            )
+            .where(
+                PokemonMovimientoAprendizajeTabla.id_movimiento == movimiento_id,
+                PokemonMovimientoAprendizajeTabla.metodo_de_aprendizaje.in_(
+                    [
+                        METODO_MOVIMIENTO["huevo"],
+                        METODO_MOVIMIENTO["nivel"],
+                        METODO_MOVIMIENTO["maquina"],
+                    ]
+                ),
+            )
+        )
+        results = s.exec(query).all()
+        pokemon_por_huevo = []
+        pokemon_por_nivel = []
+        pokemon_por_maquina = []
 
-    with Session(get_engine()) as session:
-        query_huevo = get_query_filtrar(METODO_MOVIMIENTO["huevo"], movimiento_id)
-        query_nivel = get_query_filtrar(METODO_MOVIMIENTO["nivel"], movimiento_id)
-        query_maquina = get_query_filtrar(METODO_MOVIMIENTO["maquina"], movimiento_id)
+        for pokemon, metodo in results:
+            dto = PokemonMovimiento(
+                id=pokemon.id_pokemon,
+                nombre=pokemon.nombre,
+                imagen=pokemon.imagen,
+                altura=pokemon.altura,
+                peso=pokemon.peso,
+            )
+            if metodo == METODO_MOVIMIENTO["huevo"]:
+                pokemon_por_huevo.append(dto)
+            elif metodo == METODO_MOVIMIENTO["nivel"]:
+                pokemon_por_nivel.append(dto)
+            elif metodo == METODO_MOVIMIENTO["maquina"]:
+                pokemon_por_maquina.append(dto)
 
-        results_huevo = session.exec(query_huevo).all()
-        results_nivel = session.exec(query_nivel).all()
-        results_maquina = session.exec(query_maquina).all()
+        return pokemon_por_huevo, pokemon_por_nivel, pokemon_por_maquina
 
-        agregar_resultado_listado(pokemon_por_huevo, results_huevo)
-        agregar_resultado_listado(pokemon_por_nivel, results_nivel)
-        agregar_resultado_listado(pokemon_por_maquina, results_maquina)
+    if session is not None:
+        return _ejecutar(session)
 
-    return pokemon_por_huevo, pokemon_por_nivel, pokemon_por_maquina
+    with Session(get_engine()) as new_session:
+        return _ejecutar(new_session)

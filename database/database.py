@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, func
 from modelos.modelos import (
     Equipo,
@@ -6,6 +7,7 @@ from modelos.modelos import (
     IntegranteUpsert,
     Movimiento,
     EquipooUpsert,
+    EquipoUpsert,
     Integrante,
     Tipo,
     MovimientoDetallado,
@@ -18,6 +20,7 @@ from modelos.modelos import (
     PokemonIntegrante,
     Estadisticas,
 )
+from modelos.mappers import map_integrante_tabla_to_dto, map_movimiento_tabla_to_dto
 from modelos.modelos_de_la_db import (
     DebilidadTabla,
     EquipoTabla,
@@ -206,10 +209,6 @@ class Database:
 
         return generaciones
 
-    def get_tipos(self) -> list[Tipo]:
-        tipos = self.session.exec(select(Tipo)).all()
-        return tipos
-
     def get_tipos_pokemon(self, session: Session, pokemon_id: int) -> list[TipoTabla]:
         query = (
             select(TipoTabla)
@@ -226,8 +225,8 @@ class Database:
                 )
                 .where(TipoDebilidadTabla.fk_id_tipo == tipo.id_tipo)
             )
-            debilidadaes = session.exec(query).all()
-            tipo.debilidades = debilidadaes
+            debilidades = session.exec(query).all()
+            tipo.debilidades = debilidades
         return [
             Tipo(
                 id=tipo.id_tipo,
@@ -243,7 +242,13 @@ class Database:
     def get_pokemones(
         self, session: Session, filtros: FiltrosPokemon
     ) -> list[PokemonLista]:
-        query = self.__build_query_filtros(filtros)
+        query = (
+            self.__build_query_filtros(filtros)
+            .options(
+                selectinload(PokemonTabla.generaciones),
+                selectinload(PokemonTabla.tipos),
+            )
+        )
         pokemones = session.exec(query).all()
         return [
             PokemonLista(
@@ -254,13 +259,11 @@ class Database:
                     Generacion(
                         id=generacion.id_generacion, nombre=generacion.nombre_generacion
                     )
-                    for generacion in session.get(
-                        PokemonTabla, pokemon.id_pokemon
-                    ).generaciones
+                    for generacion in pokemon.generaciones
                 ],
                 tipos=[
                     TipoMovimiento(id=tipo.id_tipo, nombre=tipo.nombre_tipo)
-                    for tipo in session.get(PokemonTabla, pokemon.id_pokemon).tipos
+                    for tipo in pokemon.tipos
                 ],
             )
             for pokemon in pokemones
@@ -300,60 +303,16 @@ class Database:
     def get_integrantes_equipo(
         self, session: Session, id_equipo: int
     ) -> list[Integrante]:
-        integrantes = []
-        query = select(IntegranteTabla).where(IntegranteTabla.id_equipo == id_equipo)
-
-        results = session.exec(query).all()
-
-        for integrante in results:
-            pokemon_del_integrante = session.get(PokemonTabla, integrante.id_pokemon)
-            movis = integrante.movimientos_del_integrante
-            integrantes.append(
-                Integrante(
-                    id=integrante.id_integrante_dentro_del_grupo,
-                    apodo=integrante.apodo,
-                    pokemon=PokemonIntegrante(
-                        id=integrante.id_pokemon,
-                        nombre=pokemon_del_integrante.nombre,
-                        imagen=pokemon_del_integrante.imagen,
-                        estadisticas=Estadisticas(
-                            ataque=pokemon_del_integrante.ataque,
-                            ataque_especial=pokemon_del_integrante.ataque_especial,
-                            defensa=pokemon_del_integrante.defensa,
-                            defensa_especial=pokemon_del_integrante.defensa_especial,
-                            puntos_de_golpe=pokemon_del_integrante.puntos_de_golpe,
-                            velocidad=pokemon_del_integrante.velocidad,
-                        ),
-                        generaciones=[
-                            Generacion(
-                                id=generacion.id_generacion,
-                                nombre=generacion.nombre_generacion,
-                            )
-                            for generacion in pokemon_del_integrante.generaciones
-                        ],
-                        tipos=[
-                            Tipo(
-                                id=tipo.id_tipo,
-                                nombre=tipo.nombre_tipo,
-                                debilidades=[
-                                    Debilidad(
-                                        id=debilidad.id_debilidad,
-                                        nombre=debilidad.nombre,
-                                    )
-                                    for debilidad in tipo.debilidades
-                                ],
-                            )
-                            for tipo in pokemon_del_integrante.tipos
-                        ],
-                    ),
-                    movimientos=[
-                        self.mostrar_por_metodo_de_mov(movi_integrante)
-                        for movi_integrante in movis
-                    ],
-                )
+        query = (
+            select(IntegranteTabla)
+            .where(IntegranteTabla.id_equipo == id_equipo)
+            .options(
+                selectinload(IntegranteTabla.pokemon),
+                selectinload(IntegranteTabla.movimientos_del_integrante),
             )
-
-        return integrantes
+        )
+        results = session.exec(query).all()
+        return [map_integrante_tabla_to_dto(integrante) for integrante in results]
 
     def get_equipo(self, session: Session, id: int) -> Equipo:
         query = (
@@ -383,27 +342,12 @@ class Database:
 
     def get_equipos(self, session: Session) -> list[EquipoListado]:
         equipos = []
-        query = (
-            select(
-                EquipoTabla,
-                GeneracionTabla,
-                func.count(IntegranteTabla.id_integrante_dentro_del_grupo).label(
-                    "cantidad_integrantes"
-                ),
+        equipos_encontrados = session.exec(
+            select(EquipoTabla).options(
+                selectinload(EquipoTabla.generacion),
+                selectinload(EquipoTabla.integrantes),
             )
-            .join(
-                GeneracionTabla,
-                EquipoTabla.id_generacion_del_equipo == GeneracionTabla.id_generacion,
-                isouter=True,
-            )
-            .join(
-                IntegranteTabla,
-                EquipoTabla.id_equipo == IntegranteTabla.id_equipo,
-                isouter=True,
-            )
-        )
-
-        equipos_encontrados = session.exec(select(EquipoTabla)).all()
+        ).all()
         for equipo in equipos_encontrados:
             equipos.append(
                 EquipoListado(
@@ -411,11 +355,13 @@ class Database:
                     nombre=equipo.nombre_equipo,
                     generacion=Generacion(
                         id=equipo.id_generacion_del_equipo,
-                        nombre=session.get(
+                        nombre=equipo.generacion.nombre_generacion
+                        if equipo.generacion
+                        else session.get(
                             GeneracionTabla, equipo.id_generacion_del_equipo
                         ).nombre_generacion,
                     ),
-                    cantidad_integrantes=len(equipo.integrantes),
+                    cantidad_integrantes=len(equipo.integrantes or []),
                 )
             )
 
@@ -468,62 +414,26 @@ class Database:
                 status_code=404, detail=f"Equipo de id {id} no encontrado"
             )
 
-        integrantes_equipo = equipo.integrantes
+        generacion_nombre = (
+            equipo.generacion.nombre_generacion
+            if equipo.generacion
+            else session.get(
+                GeneracionTabla, equipo.id_generacion_del_equipo
+            ).nombre_generacion
+        )
         equipo_borrado = Equipo(
             id=equipo.id_equipo,
             nombre=equipo.nombre_equipo,
             generacion=Generacion(
                 id=equipo.id_generacion_del_equipo,
-                nombre=session.get(
-                    GeneracionTabla, equipo.id_generacion_del_equipo
-                ).nombre_generacion,
+                nombre=generacion_nombre,
             ),
             integrantes=[
-                Integrante(
-                    id=integrante_equipo.id_integrante_dentro_del_grupo,
-                    apodo=integrante_equipo.apodo,
-                    pokemon=PokemonIntegrante(
-                        id=integrante_equipo.id_pokemon,
-                        nombre=integrante_equipo.pokemon.nombre,
-                        imagen=integrante_equipo.pokemon.imagen,
-                        estadisticas=Estadisticas(
-                            ataque=integrante_equipo.pokemon.ataque,
-                            ataque_especial=integrante_equipo.pokemon.ataque_especial,
-                            defensa=integrante_equipo.pokemon.defensa,
-                            defensa_especial=integrante_equipo.pokemon.defensa_especial,
-                            puntos_de_golpe=integrante_equipo.pokemon.puntos_de_golpe,
-                            velocidad=integrante_equipo.pokemon.velocidad,
-                        ),
-                        generaciones=[
-                            Generacion(
-                                id=gen.id_generacion, nombre=gen.nombre_generacion
-                            )
-                            for gen in integrante_equipo.pokemon.generaciones
-                        ],
-                        tipos=[
-                            Tipo(
-                                id=tipo.id_tipo,
-                                nombre=tipo.nombre_tipo,
-                                debilidades=[
-                                    Debilidad(
-                                        id=debilidad.id_debilidad,
-                                        nombre=debilidad.nombre,
-                                    )
-                                    for debilidad in tipo.debilidades
-                                ],
-                            )
-                            for tipo in integrante_equipo.pokemon.tipos
-                        ],
-                    ),
-                    movimientos=[
-                        self.mostrar_por_metodo_de_mov(movi_integrante)
-                        for movi_integrante in integrante_equipo.movimientos_del_integrante
-                    ],
-                )
-                for integrante_equipo in integrantes_equipo
+                map_integrante_tabla_to_dto(integrante)
+                for integrante in (equipo.integrantes or [])
             ],
         )
-        for integrante in equipo.integrantes:
+        for integrante in (equipo.integrantes or []):
             session.delete(integrante)
         session.delete(equipo)
         session.commit()
@@ -552,15 +462,15 @@ class Database:
                 status_code=404,
                 detail=f"La generación con id {datos_actualizados.id_generacion} no existe",
             )
-        for integrantes in equipo.integrantes:
+        for integrante in (equipo.integrantes or []):
             generacion_pokemon = session.get(
                 PokemonGeneracionTabla,
-                (integrantes.id_pokemon, datos_actualizados.id_generacion),
+                (integrante.id_pokemon, datos_actualizados.id_generacion),
             )
             if not generacion_pokemon:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Uno de los pokemones no es adecuado para la nueva generacion",
+                    detail="Uno de los pokemones no es adecuado para la nueva generacion",
                 )
 
         equipo.nombre_equipo = datos_actualizados.nombre
@@ -569,58 +479,23 @@ class Database:
         session.add(equipo)
         session.commit()
         session.refresh(equipo)
+        generacion_nombre = (
+            equipo.generacion.nombre_generacion
+            if equipo.generacion
+            else session.get(
+                GeneracionTabla, equipo.id_generacion_del_equipo
+            ).nombre_generacion
+        )
         return Equipo(
             id=equipo.id_equipo,
             nombre=equipo.nombre_equipo,
             generacion=Generacion(
                 id=equipo.id_generacion_del_equipo,
-                nombre=session.get(
-                    GeneracionTabla, equipo.id_generacion_del_equipo
-                ).nombre_generacion,
+                nombre=generacion_nombre,
             ),
             integrantes=[
-                Integrante(
-                    id=integrante_equipo.id_integrante_dentro_del_grupo,
-                    apodo=integrante_equipo.apodo,
-                    pokemon=PokemonIntegrante(
-                        id=integrante_equipo.id_pokemon,
-                        nombre=integrante_equipo.pokemon.nombre,
-                        imagen=integrante_equipo.pokemon.imagen,
-                        estadisticas=Estadisticas(
-                            ataque=integrante_equipo.pokemon.ataque,
-                            ataque_especial=integrante_equipo.pokemon.ataque_especial,
-                            defensa=integrante_equipo.pokemon.defensa,
-                            defensa_especial=integrante_equipo.pokemon.defensa_especial,
-                            puntos_de_golpe=integrante_equipo.pokemon.puntos_de_golpe,
-                            velocidad=integrante_equipo.pokemon.velocidad,
-                        ),
-                        generaciones=[
-                            Generacion(
-                                id=gen.id_generacion, nombre=gen.nombre_generacion
-                            )
-                            for gen in integrante_equipo.pokemon.generaciones
-                        ],
-                        tipos=[
-                            Tipo(
-                                id=tipo.id_tipo,
-                                nombre=tipo.nombre_tipo,
-                                debilidades=[
-                                    Debilidad(
-                                        id=debilidad.id_debilidad,
-                                        nombre=debilidad.nombre,
-                                    )
-                                    for debilidad in tipo.debilidades
-                                ],
-                            )
-                            for tipo in integrante_equipo.pokemon.tipos
-                        ],
-                    ),
-                    movimientos=[
-                        self.mostrar_por_metodo_de_mov(movi_integrante)
-                        for movi_integrante in integrante_equipo.movimientos_del_integrante
-                    ],
-                )
-                for integrante_equipo in equipo.integrantes
+                map_integrante_tabla_to_dto(integrante)
+                for integrante in (equipo.integrantes or [])
             ],
         )
 
@@ -675,48 +550,11 @@ class Database:
         session.commit()
         session.refresh(integrante_creado)
 
-        return Integrante(
-            id=integrante_creado.id_integrante_dentro_del_grupo,
-            apodo=integrante_creado.apodo,
-            pokemon=PokemonIntegrante(
-                nombre=pokemon_encontrado.nombre,
-                estadisticas=Estadisticas(
-                    ataque=pokemon_encontrado.ataque,
-                    ataque_especial=pokemon_encontrado.ataque_especial,
-                    defensa=pokemon_encontrado.defensa,
-                    defensa_especial=pokemon_encontrado.defensa_especial,
-                    puntos_de_golpe=pokemon_encontrado.puntos_de_golpe,
-                    velocidad=pokemon_encontrado.velocidad,
-                ),
-                generaciones=[
-                    Generacion(
-                        id=generacion.id_generacion, nombre=generacion.nombre_generacion
-                    )
-                    for generacion in pokemon_encontrado.generaciones
-                ],
-                id=pokemon_encontrado.id_pokemon,
-                imagen=pokemon_encontrado.imagen,
-                tipos=[
-                    Tipo(
-                        debilidades=[
-                            Debilidad(
-                                id=debilidad.id_debilidad, nombre=debilidad.nombre
-                            )
-                            for debilidad in tipo.debilidades
-                        ],
-                        id=tipo.id_tipo,
-                        nombre=tipo.nombre_tipo,
-                    )
-                    for tipo in pokemon_encontrado.tipos
-                ],
-            ),
-            movimientos=[],
-        )
+        return map_integrante_tabla_to_dto(integrante_creado, pokemon_encontrado)
 
     def delete_integrante(
         self, session: Session, id_equipo: int, integrante_id: int
     ) -> Integrante:
-        movimientos_mostrar = []
         equipo_encontrado = session.get(EquipoTabla, id_equipo)
         if not equipo_encontrado:
             raise HTTPException(
@@ -724,7 +562,7 @@ class Database:
                 detail=f"El equipo con id {id_equipo} no existe",
             )
         integrante = None
-        for integrante_buscar in equipo_encontrado.integrantes:
+        for integrante_buscar in (equipo_encontrado.integrantes or []):
             if integrante_id == integrante_buscar.id_integrante_dentro_del_grupo:
                 integrante = integrante_buscar
 
@@ -735,50 +573,10 @@ class Database:
             )
 
         pokemon_encontrado = session.get(PokemonTabla, integrante.id_pokemon)
-        for movimiento in integrante.movimientos_del_integrante:
-            movimiento_mostrar = self.mostrar_por_metodo_de_mov(movimiento)
-            movimientos_mostrar.append(movimiento_mostrar)
-
+        integrante_dto = map_integrante_tabla_to_dto(integrante, pokemon_encontrado)
         session.delete(integrante)
         session.commit()
-        pokemon_encontrado = session.get(PokemonTabla, integrante.id_pokemon)
-        return Integrante(
-            id=integrante.id_integrante_dentro_del_grupo,
-            apodo=integrante.apodo,
-            pokemon=PokemonIntegrante(
-                estadisticas=Estadisticas(
-                    ataque=pokemon_encontrado.ataque,
-                    ataque_especial=pokemon_encontrado.ataque_especial,
-                    defensa=pokemon_encontrado.defensa,
-                    defensa_especial=pokemon_encontrado.defensa_especial,
-                    puntos_de_golpe=pokemon_encontrado.puntos_de_golpe,
-                    velocidad=pokemon_encontrado.velocidad,
-                ),
-                generaciones=[
-                    Generacion(
-                        id=generacion.id_generacion, nombre=generacion.nombre_generacion
-                    )
-                    for generacion in pokemon_encontrado.generaciones
-                ],
-                id=pokemon_encontrado.id_pokemon,
-                imagen=pokemon_encontrado.imagen,
-                nombre=pokemon_encontrado.nombre,
-                tipos=[
-                    Tipo(
-                        debilidades=[
-                            Debilidad(
-                                id=debilidad.id_debilidad, nombre=debilidad.nombre
-                            )
-                            for debilidad in tipo.debilidades
-                        ],
-                        nombre=tipo.nombre_tipo,
-                        id=tipo.id_tipo,
-                    )
-                    for tipo in pokemon_encontrado.tipos
-                ],
-            ),
-            movimientos=movimientos_mostrar,
-        )
+        return integrante_dto
 
     def __build_query_filtros(self, filtros: FiltrosPokemon):
         query = select(PokemonTabla)
@@ -796,20 +594,4 @@ class Database:
         return query
 
     def mostrar_por_metodo_de_mov(self, mov: MovimientoTabla) -> Movimiento:
-        return Movimiento(
-            id=mov.id_movimiento,
-            nombre=mov.nombre,
-            generacion=Generacion(
-                id=mov.generacion.id_generacion,
-                nombre=mov.generacion.nombre_generacion,
-            ),
-            tipo=TipoMovimiento(
-                id=mov.tipo.id_tipo,
-                nombre=mov.tipo.nombre_tipo,
-            ),
-            categoria=mov.clase_de_daño,
-            potencia=mov.poder,
-            precision=mov.precision,
-            puntos_de_poder=mov.PP,
-            efecto=mov.efecto,
-        )
+        return map_movimiento_tabla_to_dto(mov)

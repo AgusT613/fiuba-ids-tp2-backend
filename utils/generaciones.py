@@ -20,27 +20,3 @@ def obtener_nombre_generacion(id: int) -> str:
                 break
 
     return nombre
-
-
-def obtener_generacion_por_pokemon(ruta_archivo, id_buscado):
-    """
-    Devuelve una lista de generaciones (id y nombre) a las que pertenece un Pokémon dado su ID.
-    """
-    generaciones = []
-
-    with open(ruta_archivo) as archivo:
-        csvFile = csv.DictReader(archivo)
-
-        for linea in csvFile:
-            pokemon_id = int(linea["pokemon_id"])
-            generation_id = int(linea["generation_id"])
-
-            if pokemon_id == id_buscado:
-                generaciones.append(
-                    {
-                        "id": generation_id,
-                        "nombre": obtener_nombre_generacion(generation_id),
-                    }
-                )
-
-    return generaciones

@@ -4,6 +4,7 @@ from dependencias.dependencias import DatabaseDep
 from dependencias.dependencias_de_la_db import SessionDep
 from modelos.modelos import (
     Equipo,
+    EquipoUpsert,
     EquipooUpsert,
     Generacion,
     Integrante,
@@ -12,13 +13,9 @@ from modelos.modelos import (
     MovimientoAIntegrante,
     IntegranteDeEquipoUpsert,
     EquipoListado,
-    Pokemon,
     TipoMovimiento,
-    PokemonIntegrante,
-    Estadisticas,
-    Tipo,
-    Debilidad,
 )
+from modelos.mappers import map_integrante_tabla_to_dto
 from modelos.modelos_de_la_db import (
     EquipoTabla,
     PokemonTabla,
@@ -99,43 +96,8 @@ def edit_integrante_de_equipo(
 
             integrante.apodo = body.apodo
             session.commit()
-            return Integrante(
-                id=integrante.id_integrante_dentro_del_grupo,
-                apodo=integrante.apodo,
-                pokemon=PokemonIntegrante(
-                    id=integrante.id_pokemon,
-                    nombre=pokemon_encontrado.nombre,
-                    imagen=pokemon_encontrado.imagen,
-                    estadisticas=Estadisticas(
-                        ataque=integrante.pokemon.ataque,
-                        ataque_especial=integrante.pokemon.ataque_especial,
-                        defensa=integrante.pokemon.defensa,
-                        defensa_especial=integrante.pokemon.defensa_especial,
-                        puntos_de_golpe=integrante.pokemon.puntos_de_golpe,
-                        velocidad=integrante.pokemon.velocidad,
-                    ),
-                    generaciones=[
-                        Generacion(
-                            id=generacion.id_generacion,
-                            nombre=generacion.nombre_generacion,
-                        )
-                        for generacion in pokemon_encontrado.generaciones
-                    ],
-                    tipos=[
-                        Tipo(
-                            debilidades=[
-                                Debilidad(
-                                    id=debilidad.id_debilidad, nombre=debilidad.nombre
-                                )
-                                for debilidad in tipo.debilidades
-                            ],
-                            nombre=tipo.nombre_tipo,
-                            id=tipo.id_tipo,
-                        )
-                        for tipo in pokemon_encontrado.tipos
-                    ],
-                ),
-                movimientos=movimientos_mostrar,
+            return map_integrante_tabla_to_dto(
+                integrante, pokemon_encontrado, movimientos=movimientos_mostrar
             )
 
 

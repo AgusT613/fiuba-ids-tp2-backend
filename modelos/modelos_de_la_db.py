@@ -28,7 +28,7 @@ class PokemonMovimientoAprendizajeTabla(SQLModel, table=True):
     id_movimiento: int = Field(
         foreign_key="movimientos.id_movimiento", primary_key=True
     )
-    metodo_de_aprendizaje: int
+    metodo_de_aprendizaje: int = Field(primary_key=True)
 
 
 class TipoDebilidadTabla(SQLModel, table=True):
@@ -42,7 +42,7 @@ class TipoDebilidadTabla(SQLModel, table=True):
 class IntegranteMovimientoTabla(SQLModel, table=True):
     __tablename__ = "relacion_integrante_movimiento"
     id_integrante: int = Field(foreign_key="integrante.id_integrante", primary_key=True)
-    id_movimiento: int = Field(foreign_key="movimientos.id_movimiento")
+    id_movimiento: int = Field(foreign_key="movimientos.id_movimiento", primary_key=True)
 
 
 class GeneracionTabla(SQLModel, table=True):
@@ -162,7 +162,7 @@ class EquipoTabla(SQLModel, table=True):
 
 class IntegranteTabla(SQLModel, table=True):
     __tablename__ = "integrante"
-    id_integrante: int = Field(primary_key=True)
+    id_integrante: Optional[int] = Field(default=None, primary_key=True)
     id_integrante_dentro_del_grupo: int
     apodo: str
     id_pokemon: int = Field(foreign_key="pokemones.id_pokemon")

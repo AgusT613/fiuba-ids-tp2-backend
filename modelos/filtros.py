@@ -1,5 +1,4 @@
-from pydantic import BaseModel
-from sqlmodel import Field
+from pydantic import BaseModel, Field
 
 
 class BaseFiltro(BaseModel):

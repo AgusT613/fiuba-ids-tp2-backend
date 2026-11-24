@@ -222,7 +222,7 @@ def cargar_estadisticas_pokemones(session, ruta_archivo, ruta_nombres):
 
     with open(ruta_archivo, "r", encoding="utf-8") as f:
         csv_file = csv.DictReader(f)
-        estadisticas = []
+        stats_por_pokemon = {}
 
         for linea in csv_file:
             id_pokemon = int(linea["pokemon_id"])
@@ -231,20 +231,16 @@ def cargar_estadisticas_pokemones(session, ruta_archivo, ruta_nombres):
 
             stat_name = nombres_estadisticas.get(stat_id, "")
             if stat_name:
-                estadisticas.append(
-                    {
-                        "id_pokemon": id_pokemon,
-                        stat_name: base_stat,
-                    }
-                )
+                if id_pokemon not in stats_por_pokemon:
+                    stats_por_pokemon[id_pokemon] = {}
+                stats_por_pokemon[id_pokemon][stat_name] = base_stat
 
-        # Inserta las estadísticas en la base de datos
-        for stat in estadisticas:
-            pokemon = session.get(PokemonTabla, stat["id_pokemon"])
+        # Inserta las estadísticas agrupadas en la base de datos
+        for id_pokemon, stats in stats_por_pokemon.items():
+            pokemon = session.get(PokemonTabla, id_pokemon)
             if pokemon:
-                for key, value in stat.items():
-                    if key != "id_pokemon":
-                        setattr(pokemon, key, value)
+                for key, value in stats.items():
+                    setattr(pokemon, key, value)
         session.commit()
 
 
