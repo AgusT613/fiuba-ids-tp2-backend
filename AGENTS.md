@@ -7,7 +7,7 @@ Este documento define la arquitectura, convenciones técnicas, restricciones y e
 ## 1. Contexto y Objetivos del Proyecto
 
 - **Materia:** Introducción al Desarrollo de Software (FIUBA) — TP2 Parte 2.
-- **Objetivo Principal:** Proveer una API REST para consultar datos de Pokémon y gestionar equipos competitivos persistidos en **SQLite** utilizando **FastAPI** y **SQLModel**.
+- **Objetivo Principal:** Proveer una API REST para consultar datos de Pokémon y gestionar equipos competitivos persistidos en **PostgreSQL** (con fallback compatible a **SQLite**) utilizando **FastAPI** y **SQLModel**.
 - **Requisitos Académicos:** Consultar siempre [CONSIGNA.md](file:///home/agust613/Desktop/agus/projects/fiuba-ids-pokedex/fiuba-ids-tp2-backend/CONSIGNA.md) para verificar restricciones del trabajo práctico.
 
 ---
@@ -20,7 +20,8 @@ Este documento define la arquitectura, convenciones técnicas, restricciones y e
 1. **Gestor de Paquetes:** Utilizar exclusivamente `pipenv` (`pipenv install`, `pipenv run ...`).
 2. **Estilo de Código:** Cumplir con las convenciones de PEP 8 y lineamientos de `black`.
 3. **Flujo de Base de Datos:**
-   - La base de datos es SQLite (`database.db`).
+   - Base de datos principal: **PostgreSQL** (definida vía `DATABASE_URL` o variables `POSTGRES_*`), con contenedor Docker Compose provisto (`docker-compose.yml`).
+   - Soporte dual con **SQLite** (`sqlite:///database.db` o `sqlite:///:memory:` para tests).
    - Las modificaciones en las tablas deben realizarse **siempre** mediante migraciones de **Alembic** (`alembic revision -m "..."` y `alembic upgrade head`).
    - El script `seed.py` puebla los datos iniciales desde los archivos CSV ubicados en `/data`.
 4. **Preservación de Archivos:** No eliminar ni renombrar [CONSIGNA.md](file:///home/agust613/Desktop/agus/projects/fiuba-ids-pokedex/fiuba-ids-tp2-backend/CONSIGNA.md).

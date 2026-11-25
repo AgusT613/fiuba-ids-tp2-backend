@@ -41,37 +41,41 @@ from sqlmodel import select
 
 def seed_ya_hecho(session: Session) -> bool:
     query_db = select(SeedDb).where(SeedDb.id == 1)
-
-    return session.exec(query_db).first().hecho == 1
+    record = session.exec(query_db).first()
+    if record is None:
+        return False
+    return record.hecho == 1
 
 
 def actualizar_estado_seed(session: Session, hecho: int = 1, id: int = 1):
     query_db = select(SeedDb).where(SeedDb.id == id)
+    seed_record = session.exec(query_db).first()
+    if seed_record is None:
+        seed_record = SeedDb(id=id, hecho=hecho)
+    else:
+        seed_record.hecho = hecho
 
-    seed = session.exec(query_db).first()
-    seed.hecho = hecho
-
-    session.add(seed)
+    session.add(seed_record)
     session.commit()
-    session.refresh(seed)
+    session.refresh(seed_record)
 
 
 def seed():
     with Session(get_engine()) as session:
         if not seed_ya_hecho(session):
             cargar_generaciones(session, RUTA_GENERATION_CSV)
+            cargar_nombres_tipos(session, RUTA_TYPE_NAMES_CSV)
+            cargar_nombres_habilidades(session, RUTA_ABILITY_NAMES_CSV)
+            cargar_debilidades(session, RUTA_TYPE_NAMES_CSV)
             cargar_pokemones(session, RUTA_POKEMON_CSV)
             cargar_movimientos(session, RUTA_MOVES_CSV)
-            cargar_nombres_habilidades(session, RUTA_ABILITY_NAMES_CSV)
             cargar_pokemon_habilidades(session, RUTA_POKEMON_ABILITIES_CSV)
-            cargar_nombres_tipos(session, RUTA_TYPE_NAMES_CSV)
             cargar_pokemon_tipos(session, RUTA_POKEMON_TYPES_CSV)
             cargar_pokemon_movimientos(session, RUTA_POKEMON_MOVES_CSV)
             cargar_estadisticas_pokemones(
                 session, RUTA_POKEMON_STATS_CSV, RUTA_STAT_NAMES_CSV
-            ),
-            cargar_pokemon_generaciones(session, RUTA_POKEMON_GENERATIONS_CSV),
-            cargar_debilidades(session, RUTA_TYPE_NAMES_CSV)
+            )
+            cargar_pokemon_generaciones(session, RUTA_POKEMON_GENERATIONS_CSV)
             cargar_tipo_debilidad(session, RUTA_TYPE_EFFICACY_CSV)
             cargar_evoluciones(session, RUTA_POKEMON_EVOLUTIONS_CSV, RUTA_POKEMON_CSV)
 
@@ -164,16 +168,20 @@ def cargar_pokemon_habilidades(session, ruta_archivo):
 
 
 def cargar_nombres_tipos(session, ruta_archivo):
+    tipos_dict = {}
     with open(ruta_archivo, "r", encoding="utf-8") as archivo:
         csv_file = csv.DictReader(archivo)
-        tipos = [
-            TipoTabla(
-                nombre_tipo=(linea["name"]),
-                id_tipo=int(linea["type_id"]),
-            )
-            for linea in csv_file
-            if linea["local_language_id"] == "7"
-        ]
+        for linea in csv_file:
+            t_id = int(linea["type_id"])
+            if linea["local_language_id"] == "7":
+                tipos_dict[t_id] = linea["name"]
+            elif t_id not in tipos_dict and linea["local_language_id"] == "9":
+                tipos_dict[t_id] = "Sombra" if linea["name"] == "Shadow" else linea["name"]
+
+    tipos = [
+        TipoTabla(id_tipo=t_id, nombre_tipo=name)
+        for t_id, name in tipos_dict.items()
+    ]
     session.add_all(tipos)
     session.commit()
 

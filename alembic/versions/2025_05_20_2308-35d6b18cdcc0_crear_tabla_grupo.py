@@ -24,7 +24,7 @@ def upgrade() -> None:
         "equipos",
         sa.Column("id_equipo", sa.Integer, primary_key=True),
         sa.Column("nombre_equipo", sa.Text, nullable=False),
-        sa.Column("id_generacion_del_equipo", sa.Text, nullable=False),
+        sa.Column("id_generacion_del_equipo", sa.Integer, nullable=False),
     )
     op.create_table(
         "integrante",

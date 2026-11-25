@@ -8,14 +8,58 @@ Backend RESTful desarrollado en Python para la gestión, consulta y armado de eq
 
 - **Lenguaje:** Python 3.13+
 - **Framework Web:** [FastAPI](https://fastapi.tiangolo.com/) (con Starlette y Pydantic v2)
-- **Base de Datos y ORM:** SQLite y [SQLModel](https://sqlmodel.tiangolo.com/) (SQLAlchemy core)
+- **Base de Datos y ORM:** PostgreSQL / SQLite y [SQLModel](https://sqlmodel.tiangolo.com/) (SQLAlchemy core con driver `psycopg2`)
 - **Migraciones:** [Alembic](https://alembic.sqlalchemy.org/)
 - **Entorno Virtual y Paquetes:** [Pipenv](https://pipenv.pypa.io/)
+- **Contenedores:** Docker Compose (PostgreSQL 16)
 - **Testing:** [Pytest](https://docs.pytest.org/) con `TestClient`
 
 ---
 
-## 🚀 Instalación y Puesta en Marcha
+## 🐳 Ejecución con Docker (Recomendada)
+
+Puedes levantar todo el entorno (Base de datos PostgreSQL + API de FastAPI) con un solo comando gracias a Docker Compose:
+
+### 1. Configurar variables de entorno
+Copia la plantilla de variables si aún no lo hiciste:
+```bash
+cp .env.example .env
+```
+*(Todas las credenciales, puertos y URLs se configuran en `.env` como única fuente de verdad).*
+
+### 2. Construir e iniciar los contenedores
+```bash
+docker compose up -d --build
+```
+> [!NOTE]
+> La API espera automáticamente a que el contenedor de PostgreSQL esté saludable (`healthy`). Luego, ejecuta las migraciones pendientes de Alembic y corre el seed inicial de datos desde `/data`.
+
+### 3. Verificar el estado
+```bash
+# Ver estado de los contenedores
+docker compose ps
+
+# Ver logs en tiempo real
+docker compose logs -f api
+```
+
+La API quedará disponible en `http://localhost:8000` (docs en `http://localhost:8000/docs`).
+
+### 4. Detener o limpiar el entorno
+```bash
+# Detener los contenedores
+docker compose down
+
+# Detener y eliminar volúmenes (reiniciar base de datos limpia)
+docker compose down -v
+
+# Limpieza total (contenedores, volúmenes e imágenes construidas)
+docker compose down -v --rmi all
+```
+
+---
+
+## 💻 Desarrollo Local (Sin Docker para la API)
 
 ### 1. Clonar el repositorio y configurar el entorno
 Asegúrate de contar con Python 3.13 y `pipenv` instalados:
@@ -23,10 +67,28 @@ Asegúrate de contar con Python 3.13 y `pipenv` instalados:
 ```bash
 # Instalar dependencias del Pipfile
 pipenv install
+
+# Configurar variables de entorno
+cp .env.example .env
 ```
 
-### 2. Base de Datos y Migraciones
-Al iniciar la aplicación por primera vez, el ciclo de vida de FastAPI (`lifespan`) detecta si la base de datos `database.db` no existe, ejecuta automáticamente las migraciones con Alembic y realiza el seed de datos a partir de los archivos CSV en `/data`.
+### 2. Base de Datos (PostgreSQL o SQLite)
+
+#### Opción A: Solo PostgreSQL con Docker Compose
+Si quieres correr únicamente la base de datos en Docker y la aplicación en tu máquina local:
+
+```bash
+docker compose up -d db
+```
+
+#### Opción B: SQLite Local
+Si prefieres utilizar SQLite localmente sin Docker:
+```bash
+export DATABASE_URL="sqlite:///database.db"
+```
+
+### 3. Migraciones y Seed de Datos
+Al iniciar la aplicación, el ciclo de vida de FastAPI (`lifespan`) aplica automáticamente las migraciones pendientes con Alembic y realiza el seed de datos si la base se encuentra vacía.
 
 Si deseas ejecutar manualmente las migraciones:
 
@@ -40,7 +102,7 @@ Para poblar manualmente la base de datos (opcional):
 pipenv run python -c "from seed import seed; seed()"
 ```
 
-### 3. Iniciar el Servidor de Desarrollo
+### 4. Iniciar el Servidor de Desarrollo
 
 ```bash
 pipenv run fastapi dev main.py

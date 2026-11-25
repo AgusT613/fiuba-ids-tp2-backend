@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
-import os
-import subprocess
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config.settings import settings
@@ -9,6 +8,8 @@ from dependencias.dependencias_de_la_db import init_engine
 from rutas.index import api_router
 from seed import seed
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,13 +17,17 @@ async def lifespan(app: FastAPI):
     init_engine()
     inicializar_deps()
 
-    if not os.path.exists(settings.sqlite_file_path):
-        print("Realizando migraciones...")
-        subprocess.run(["alembic", "upgrade", "head"])
-        print("Migraciones realizadas!")
-        print("Realizando seed de datos...")
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        alembic_cfg = Config("alembic.ini")
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
+        command.upgrade(alembic_cfg, "head")
+
         seed()
-        print("Seed de datos realizado!")
+    except Exception as e:
+        logger.warning("Aviso durante inicialización o migraciones de base de datos: %s", e)
 
     yield
 

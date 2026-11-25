@@ -4,3 +4,4 @@ __pycache__
 database.db
 venv
 .pytest_cache
+.env

@@ -20,9 +20,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("equipos") as batch_op:
-        batch_op.drop_column("id_generacion_del_equipo")
-        batch_op.add_column(sa.Column("id_generacion_del_equipo", sa.Integer))
+    bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        with op.batch_alter_table("equipos") as batch_op:
+            batch_op.drop_column("id_generacion_del_equipo")
+            batch_op.add_column(sa.Column("id_generacion_del_equipo", sa.Integer))
     pass
 
 
