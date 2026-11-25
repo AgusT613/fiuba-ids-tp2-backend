@@ -29,8 +29,8 @@ def upgrade() -> None:
         sa.Column("poder", sa.Integer, nullable=False),
         sa.Column("PP", sa.Integer, nullable=False),
         sa.Column("precision", sa.Integer, nullable=False),
-        sa.Column("clase_de_daño", sa.Integer, nullable=False),
-        sa.Column("efecto", sa.Integer, nullable=False),
+        sa.Column("clase_de_daño", sa.Text, nullable=False),
+        sa.Column("efecto", sa.Text, nullable=False),
     )
     op.create_table(
         "pokemones_que_pueden_aprender_un_movimiento",

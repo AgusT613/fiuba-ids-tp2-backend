@@ -154,6 +154,7 @@ def cargar_nombres_habilidades(session, ruta_archivo):
 
 
 def cargar_pokemon_habilidades(session, ruta_archivo):
+    pokemon_ids = set(session.exec(select(PokemonTabla.id_pokemon)).all())
     with open(ruta_archivo, "r", encoding="utf-8") as archivo:
         csv_file = csv.DictReader(archivo)
         pokemon_habilidades = [
@@ -162,6 +163,7 @@ def cargar_pokemon_habilidades(session, ruta_archivo):
                 id_habilidad=int(linea["ability_id"]),
             )
             for linea in csv_file
+            if int(linea["pokemon_id"]) in pokemon_ids
         ]
     session.add_all(pokemon_habilidades)
     session.commit()
@@ -187,6 +189,7 @@ def cargar_nombres_tipos(session, ruta_archivo):
 
 
 def cargar_pokemon_tipos(session, ruta_archivo):
+    pokemon_ids = set(session.exec(select(PokemonTabla.id_pokemon)).all())
     with open(ruta_archivo, "r", encoding="utf-8") as archivo:
         csv_file = csv.DictReader(archivo)
         pokemon_tipos = [
@@ -195,18 +198,22 @@ def cargar_pokemon_tipos(session, ruta_archivo):
                 id_tipo=int(linea["type_id"]),
             )
             for linea in csv_file
+            if int(linea["pokemon_id"]) in pokemon_ids
         ]
     session.add_all(pokemon_tipos)
     session.commit()
 
 
 def cargar_pokemon_movimientos(session, ruta_archivo):
+    pokemon_ids = set(session.exec(select(PokemonTabla.id_pokemon)).all())
     nueva_combi = set()
     pokemon_movimientos = []
     with open(ruta_archivo, "r", encoding="utf-8") as archivo:
         csv_file = csv.DictReader(archivo)
         for linea in csv_file:
             id_pokemon = int(linea["pokemon_id"])
+            if id_pokemon not in pokemon_ids:
+                continue
             id_movimiento = int(linea["move_id"])
             metodo_de_aprendizaje = int(linea["pokemon_move_method_id"])
 
@@ -216,9 +223,9 @@ def cargar_pokemon_movimientos(session, ruta_archivo):
                 nueva_combi.add(combinacion)
                 pokemon_movimientos.append(
                     PokemonMovimientoAprendizajeTabla(
-                        id_pokemon=int(linea["pokemon_id"]),
-                        id_movimiento=int(linea["move_id"]),
-                        metodo_de_aprendizaje=int(linea["pokemon_move_method_id"]),
+                        id_pokemon=id_pokemon,
+                        id_movimiento=id_movimiento,
+                        metodo_de_aprendizaje=metodo_de_aprendizaje,
                     )
                 )
     session.add_all(pokemon_movimientos)
@@ -269,6 +276,7 @@ def cargar_nombres_estadisticas(ruta_archivo):
 
 
 def cargar_pokemon_generaciones(session, ruta_archivo):
+    pokemon_ids = set(session.exec(select(PokemonTabla.id_pokemon)).all())
     with open(ruta_archivo, "r", encoding="utf-8") as archivo:
         csv_file = csv.DictReader(archivo)
         relaciones = [
@@ -277,6 +285,7 @@ def cargar_pokemon_generaciones(session, ruta_archivo):
                 id_generacion=int(linea["generation_id"]),
             )
             for linea in csv_file
+            if int(linea["pokemon_id"]) in pokemon_ids
         ]
     session.add_all(relaciones)
     session.commit()
@@ -310,6 +319,7 @@ def cargar_tipo_debilidad(session, ruta_type_efficacy):
 
 
 def cargar_evoluciones(session, ruta_evoluciones, ruta_pokemon):
+    pokemon_ids = set(session.exec(select(PokemonTabla.id_pokemon)).all())
     nombres = {}
     with open(ruta_pokemon, "r", encoding="utf-8") as archivo:
         csv_file = csv.DictReader(archivo)
@@ -326,6 +336,7 @@ def cargar_evoluciones(session, ruta_evoluciones, ruta_pokemon):
                 imagen=obtener_imagen_pokemon(int(linea["evolution_id"])),
             )
             for linea in csv_file
+            if int(linea["id"]) in pokemon_ids
         ]
     session.add_all(evoluciones)
     session.commit()
